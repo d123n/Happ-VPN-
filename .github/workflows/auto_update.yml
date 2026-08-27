@@ -1,0 +1,34 @@
+name: Auto Update VPN Subscription
+
+on:
+  schedule:
+    # Запуск каждые 6 часов
+    - cron: '0 */6 * * *'
+  # Возможность запустить вручную
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Чтение репозитория
+        uses: actions/checkout@v3
+
+      - name: Настройка Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Установка зависимостей
+        run: pip install requests
+
+      - name: Запуск скрипта
+        run: python auto_vpn.py
+
+      - name: Сохранение результатов в GitHub
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add happ_subscription.txt
+          git commit -m "Auto-update subscription" || exit 0
+          git push
