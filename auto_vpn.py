@@ -2,14 +2,16 @@ import json
 import requests
 import urllib.parse
 
-# Публичные источники с VLESS и Hysteria2 серверами
+# Расширенный список источников с VLESS / Hysteria2 серверами
 SOURCES = [
     "https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/vless",
+    "https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/hysteria2",
     "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/All_Configs_Sub.txt",
+    "https://raw.githubusercontent.com/freefq/free/master/v2",
+    "https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_merge.txt"
 ]
 
 def parse_vless(url_str, index):
-    """Преобразует vless:// ссылку в строго валидный Outbound для Happ / Sing-Box"""
     try:
         parsed = urllib.parse.urlparse(url_str)
         if parsed.scheme != "vless":
@@ -24,13 +26,12 @@ def parse_vless(url_str, index):
         
         outbound = {
             "type": "vless",
-            "tag": f"[{index}] {tag_name[:25]}",
+            "tag": f"[{index}] {tag_name[:20]}",
             "server": parsed.hostname,
             "server_port": int(parsed.port or 443),
             "uuid": parsed.username
         }
         
-        # Настройка TLS / REALITY
         if security in ["tls", "reality"]:
             tls_config = {
                 "enabled": True,
@@ -48,7 +49,6 @@ def parse_vless(url_str, index):
                     }
             outbound["tls"] = tls_config
 
-        # Настройка транспорта (ws / gRPC / tcp)
         if net_type == "ws":
             outbound["transport"] = {
                 "type": "ws",
@@ -60,7 +60,6 @@ def parse_vless(url_str, index):
                 "service_name": params.get("serviceName", [""])[0]
             }
 
-        # Обязательный параметр flow для XTLS
         flow = params.get("flow", [""])[0]
         if flow:
             outbound["flow"] = flow
@@ -74,7 +73,6 @@ def generate_happ_config():
     server_tags = []
     count = 1
 
-    print("[*] Загрузка и фильтрация серверов...")
     for src in SOURCES:
         try:
             res = requests.get(src, timeout=10)
@@ -89,17 +87,15 @@ def generate_happ_config():
                             server_tags.append(node["tag"])
                             count += 1
         except Exception as e:
-            print(f"[!] Ошибка источника {src}: {e}")
+            print(f"Ошибка загрузки из {src}: {e}")
 
+    # Fallback, если список пуст
     if not server_tags:
-        print("[!] Не удалось найти подходящие сервера!")
-        return
+        print("Внимание: Источники не ответили, создается минимальная заглушка")
+        server_tags = ["direct"]
 
-    # Формируем ИДЕАЛЬНЫЙ JSON-конфиг для Happ
     happ_config = {
-        "log": {
-            "level": "warn"
-        },
+        "log": {"level": "warn"},
         "dns": {
             "servers": [
                 {"tag": "dns-remote", "address": "https://1.1.1.1/dns-query", "detour": "select"},
@@ -132,11 +128,9 @@ def generate_happ_config():
         }
     }
 
-    # Сохраняем в файл happ_config.json
+    # Гарантированное создание файла при любом исходе
     with open("happ_config.json", "w", encoding="utf-8") as f:
         json.dump(happ_config, f, indent=2, ensure_ascii=False)
-        
-    print(f"[✔] Успешно сформирован happ_config.json с {len(server_tags)} серверами.")
 
 if __name__ == "__main__":
     generate_happ_config()
