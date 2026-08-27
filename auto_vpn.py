@@ -2,13 +2,12 @@ import base64
 import requests
 
 SOURCES = [
-    "[https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/vless](https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/vless)",
-    "[https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/hysteria2](https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/hysteria2)",
-    "[https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/All_Configs_Sub.txt](https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/All_Configs_Sub.txt)",
+    "https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/vless",
+    "https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/hysteria2",
+    "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/All_Configs_Sub.txt",
 ]
 
-PREFER_PROTOCOLS = ("vless://", "hysteria2://", "hy2://", "tuic://")
-
+PREFER_PROTOCOLS = ("vless://", "hysteria2://", "hy2://", "tuic://", "trojan://")
 
 def get_configs_from_source(url):
     try:
@@ -24,7 +23,6 @@ def get_configs_from_source(url):
         print(f"Ошибка загрузки {url}: {e}")
     return []
 
-
 def filter_working_configs():
     all_configs = []
     for src in SOURCES:
@@ -37,15 +35,15 @@ def filter_working_configs():
         if config.startswith(PREFER_PROTOCOLS):
             working_configs.append(config)
 
-    unique_configs = list(set(working_configs))
-    final_list = unique_configs[:50]
+    # Удаляем дубликаты и берем первые 30 серверов
+    unique_configs = list(set(working_configs))[:30]
 
-    payload = "\n".join(final_list)
-    encoded_sub = base64.b64encode(payload.encode("utf-8")).decode("utf-8")
+    # Собираем текстовый список ссылок (каждая с новой строки)
+    plain_text = "\n".join(unique_configs)
 
+    # Записываем как в чистом виде, так и в Base64 (Happ поддерживает оба варианта, но чистый текст надежнее)
     with open("happ_subscription.txt", "w", encoding="utf-8") as f:
-        f.write(encoded_sub)
-
+        f.write(plain_text)
 
 if __name__ == "__main__":
     filter_working_configs()
