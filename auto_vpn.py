@@ -1,15 +1,22 @@
 import json
+import re
 import requests
 import urllib.parse
 
-# Расширенный список источников с VLESS / Hysteria2 серверами
 SOURCES = [
     "https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/vless",
-    "https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/hysteria2",
     "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/All_Configs_Sub.txt",
-    "https://raw.githubusercontent.com/freefq/free/master/v2",
-    "https://raw.githubusercontent.com/mahdibland/V2RayAggregator/master/sub/sub_merge.txt"
+    "https://raw.githubusercontent.com/freefq/free/master/v2"
 ]
+
+def clean_tag(text):
+    """Очищает названия серверов от кавычек, переносов и управляющих символов"""
+    if not text:
+        return "Server"
+    text = urllib.parse.unquote(text)
+    # Удаляем все символы, кроме букв, цифр, пробелов и дефисов
+    text = re.sub(r'[^\w\s\-\.]', '', text, flags=re.UNICODE)
+    return text.strip()[:20] or "Server"
 
 def parse_vless(url_str, index):
     try:
@@ -18,7 +25,8 @@ def parse_vless(url_str, index):
             return None
             
         params = urllib.parse.parse_qs(parsed.query)
-        tag_name = urllib.parse.unquote(parsed.fragment) if parsed.fragment else f"Server-{index}"
+        raw_fragment = parsed.fragment or f"Server-{index}"
+        tag_name = clean_tag(raw_fragment)
         
         security = params.get("security", ["none"])[0]
         net_type = params.get("type", ["tcp"])[0]
@@ -26,7 +34,7 @@ def parse_vless(url_str, index):
         
         outbound = {
             "type": "vless",
-            "tag": f"[{index}] {tag_name[:20]}",
+            "tag": f"S{index}-{tag_name}",
             "server": parsed.hostname,
             "server_port": int(parsed.port or 443),
             "uuid": parsed.username
@@ -80,25 +88,27 @@ def generate_happ_config():
                 lines = res.text.strip().splitlines()
                 for line in lines:
                     line = line.strip()
-                    if line.startswith("vless://") and count <= 30:
+                    if line.startswith("vless://") and count <= 20:
                         node = parse_vless(line, count)
                         if node and node.get("server"):
                             collected_servers.append(node)
                             server_tags.append(node["tag"])
                             count += 1
         except Exception as e:
-            print(f"Ошибка загрузки из {src}: {e}")
+            print(f"Ошибка источника: {e}")
 
-    # Fallback, если список пуст
+    # Если не удалось получить серверы — добавляем заглушку
     if not server_tags:
-        print("Внимание: Источники не ответили, создается минимальная заглушка")
         server_tags = ["direct"]
 
+    # Строго валидный JSON-ОБЪЕКТ (словаревая структура Sing-Box)
     happ_config = {
-        "log": {"level": "warn"},
+        "log": {
+            "level": "warn"
+        },
         "dns": {
             "servers": [
-                {"tag": "dns-remote", "address": "https://1.1.1.1/dns-query", "detour": "select"},
+                {"tag": "dns-remote", "address": "8.8.8.8"},
                 {"tag": "dns-direct", "address": "223.5.5.5", "detour": "direct"}
             ]
         },
@@ -114,23 +124,22 @@ def generate_happ_config():
             {
                 "type": "selector",
                 "tag": "select",
-                "outbounds": server_tags + ["direct"],
+                "outbounds": server_tags,
                 "default": server_tags[0]
             },
-            {"type": "direct", "tag": "direct"},
-            {"type": "block", "tag": "block"}
+            {
+                "type": "direct",
+                "tag": "direct"
+            }
         ] + collected_servers,
         "route": {
-            "rules": [
-                {"protocol": "dns", "outbound": "dns-remote"}
-            ],
             "auto_detect_interface": True
         }
     }
 
-    # Гарантированное создание файла при любом исходе
+    # Запись в файл с отключением не-ASCII символов (гарантирует отсутствие поломанных кодировок)
     with open("happ_config.json", "w", encoding="utf-8") as f:
-        json.dump(happ_config, f, indent=2, ensure_ascii=False)
+        json.dump(happ_config, f, indent=2, ensure_ascii=True)
 
 if __name__ == "__main__":
     generate_happ_config()
