@@ -35,15 +35,15 @@ def filter_working_configs():
         if config.startswith(PREFER_PROTOCOLS):
             working_configs.append(config)
 
-    # Удаляем дубликаты и берем первые 30 серверов
     unique_configs = list(set(working_configs))[:30]
 
-    # Собираем текстовый список ссылок (каждая с новой строки)
-    plain_text = "\n".join(unique_configs)
+    # Объединяем ссылки и кодируем всю подписку целиком в чистый Base64
+    raw_text = "\n".join(unique_configs)
+    encoded_bytes = base64.b64encode(raw_text.encode("utf-8"))
+    encoded_string = encoded_bytes.decode("utf-8")
 
-    # Записываем как в чистом виде, так и в Base64 (Happ поддерживает оба варианта, но чистый текст надежнее)
     with open("happ_subscription.txt", "w", encoding="utf-8") as f:
-        f.write(plain_text)
+        f.write(encoded_string)
 
 if __name__ == "__main__":
     filter_working_configs()
