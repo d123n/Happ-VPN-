@@ -1,66 +1,51 @@
-import requests
 import base64
-import time
+import requests
 
-# Список публичных автообновляемых источников с протоколами, стойкими к блокировкам (VLESS, Hysteria2 и др.)
 SOURCES = [
-    "https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/vless",
-    "https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/hysteria2",
-    "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/All_Configs_Sub.txt"
+    "[https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/vless](https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/vless)",
+    "[https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/hysteria2](https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/hysteria2)",
+    "[https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/All_Configs_Sub.txt](https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/All_Configs_Sub.txt)",
 ]
 
-# Ключевые протоколы и обертки, которые чаще всего работают при блокировках в РФ
 PREFER_PROTOCOLS = ("vless://", "hysteria2://", "hy2://", "tuic://")
+
 
 def get_configs_from_source(url):
     try:
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
             content = response.text.strip()
-            # Если содержимое в формате Base64 — декодируем
             try:
-                decoded = base64.b64decode(content).decode('utf-8')
+                decoded = base64.b64decode(content).decode("utf-8")
                 return decoded.splitlines()
             except Exception:
                 return content.splitlines()
     except Exception as e:
-        print(f"[!] Ошибка загрузки {url}: {e}")
+        print(f"Ошибка загрузки {url}: {e}")
     return []
+
 
 def filter_working_configs():
     all_configs = []
-    
-    print("[*] Сбор конфигураций из источников...")
     for src in SOURCES:
         configs = get_configs_from_source(src)
         all_configs.extend(configs)
-    
-    print(f"[*] Всего найдено записей: {len(all_configs)}")
-    
+
     working_configs = []
     for config in all_configs:
         config = config.strip()
-        # Фильтрация: отбираем только современные протоколы для обхода блокировок
         if config.startswith(PREFER_PROTOCOLS):
-            # Исключаем заведомо нерабочие заблокированные стандартные порты (например, чистый HTTP)
             working_configs.append(config)
 
-    # Удаляем дубликаты
     unique_configs = list(set(working_configs))
-    print(f"[+] Очищено и отобрано рабочих протоколов: {len(unique_configs)}")
-
-    # Ограничиваем список (например, первые 50 свежих серверов), чтобы Happ не зависал при проверке
     final_list = unique_configs[:50]
-    
-    # Формируем Base64 строку подписки
+
     payload = "\n".join(final_list)
-    encoded_sub = base64.b64encode(payload.encode('utf-8')).decode('utf-8')
-    
-    # Сохраняем результат в локальный файл
+    encoded_sub = base64.b64encode(payload.encode("utf-8")).decode("utf-8")
+
     with open("happ_subscription.txt", "w", encoding="utf-8") as f:
         f.write(encoded_sub)
-        
-    print("[✔] Готово! Файл 'happ_subscription.txt' сформирован.")
+
 
 if __name__ == "__main__":
     filter_working_configs()
