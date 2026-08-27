@@ -29,7 +29,7 @@ jobs:
       - name: Сохранение результатов в GitHub
         run: |
           git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]"
-          git add happ_subscription.txt
-          git commit -m "Auto-update subscription" || echo "No changes"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add happ_config.json
+          git commit -m "Auto-update happ config" || echo "No changes"
           git push
