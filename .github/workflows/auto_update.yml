@@ -21,8 +21,7 @@ jobs:
           python-version: '3.x'
 
       - name: Установка зависимостей
-        run: |
-          pip install requests
+        run: pip install requests
 
       - name: Запуск скрипта
         run: python auto_vpn.py
@@ -31,6 +30,6 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]"
-          git add happ_singbox.json
-          git commit -m "Auto-update singbox config" || echo "No changes"
+          git add happ_subscription.txt
+          git commit -m "Auto-update subscription" || echo "No changes"
           git push
