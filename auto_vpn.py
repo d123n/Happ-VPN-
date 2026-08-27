@@ -1,49 +1,92 @@
-import base64
+import json
 import requests
+import urllib.parse
 
+# Источники рабочих конфигураций
 SOURCES = [
     "https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/vless",
     "https://raw.githubusercontent.com/yebekhe/TelegramV2rayCollector/main/sub/normal/hysteria2",
-    "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/All_Configs_Sub.txt",
 ]
 
-PREFER_PROTOCOLS = ("vless://", "hysteria2://", "hy2://", "tuic://", "trojan://")
-
-def get_configs_from_source(url):
+def parse_vless(url_str):
+    """Парсинг VLESS-ссылки в формат объекта Sing-box"""
     try:
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            content = response.text.strip()
-            try:
-                decoded = base64.b64decode(content).decode("utf-8")
-                return decoded.splitlines()
-            except Exception:
-                return content.splitlines()
-    except Exception as e:
-        print(f"Ошибка загрузки {url}: {e}")
-    return []
+        parsed = urllib.parse.urlparse(url_str)
+        params = urllib.parse.parse_qs(parsed.query)
+        fragment = urllib.parse.unquote(parsed.fragment) or "VLESS Server"
+        
+        outbound = {
+            "type": "vless",
+            "tag": fragment,
+            "server": parsed.hostname,
+            "server_port": parsed.port or 443,
+            "uuid": parsed.username,
+            "network": params.get("type", ["tcp"])[0],
+            "tls": {
+                "enabled": params.get("security", ["none"])[0] in ["tls", "reality"],
+                "server_name": params.get("sni", [""])[0] or parsed.hostname,
+                "insecure": True
+            }
+        }
+        
+        if params.get("security", ["none"])[0] == "reality":
+            outbound["tls"]["reality"] = {
+                "enabled": True,
+                "public_key": params.get("pbk", [""])[0],
+                "short_id": params.get("sid", [""])[0]
+            }
+            
+        if params.get("type", [""])[0] == "ws":
+            outbound["transport"] = {
+                "type": "ws",
+                "path": params.get("path", ["/"])[0]
+            }
+            
+        return outbound
+    except Exception:
+        return None
 
-def filter_working_configs():
-    all_configs = []
+def build_singbox_config():
+    outbounds = []
+    
+    # Резервный прямой выход
+    outbounds.append({"type": "direct", "tag": "direct"})
+    
+    server_tags = []
+    count = 0
+    
     for src in SOURCES:
-        configs = get_configs_from_source(src)
-        all_configs.extend(configs)
+        try:
+            res = requests.get(src, timeout=10)
+            if res.status_code == 200:
+                lines = res.text.strip().splitlines()
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith("vless://") and count < 20:
+                        node = parse_vless(line)
+                        if node:
+                            outbounds.append(node)
+                            server_tags.append(node["tag"])
+                            count += 1
+        except Exception as e:
+            print(f"Ошибка загрузки {src}: {e}")
 
-    working_configs = []
-    for config in all_configs:
-        config = config.strip()
-        if config.startswith(PREFER_PROTOCOLS):
-            working_configs.append(config)
+    # Создаем селектор вывода (для удобного переключения в Happ)
+    if server_tags:
+        outbounds.insert(0, {
+            "type": "selector",
+            "tag": "select",
+            "outbounds": server_tags + ["direct"],
+            "default": server_tags[0]
+        })
 
-    unique_configs = list(set(working_configs))[:30]
+    config = {
+        "outbounds": outbounds
+    }
 
-    # Объединяем ссылки и кодируем всю подписку целиком в чистый Base64
-    raw_text = "\n".join(unique_configs)
-    encoded_bytes = base64.b64encode(raw_text.encode("utf-8"))
-    encoded_string = encoded_bytes.decode("utf-8")
-
-    with open("happ_subscription.txt", "w", encoding="utf-8") as f:
-        f.write(encoded_string)
+    # Сохраняем в JSON
+    with open("happ_singbox.json", "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
 
 if __name__ == "__main__":
-    filter_working_configs()
+    build_singbox_config()
