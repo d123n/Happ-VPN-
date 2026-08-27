@@ -6,8 +6,7 @@
     "servers": [
       {
         "tag": "dns-remote",
-        "address": "https://1.1.1.1/dns-query",
-        "detour": "select"
+        "address": "8.8.8.8"
       },
       {
         "tag": "dns-direct",
@@ -29,7 +28,6 @@
       "type": "selector",
       "tag": "select",
       "outbounds": [
-        "direct",
         "direct"
       ],
       "default": "direct"
@@ -37,19 +35,9 @@
     {
       "type": "direct",
       "tag": "direct"
-    },
-    {
-      "type": "block",
-      "tag": "block"
     }
   ],
   "route": {
-    "rules": [
-      {
-        "protocol": "dns",
-        "outbound": "dns-remote"
-      }
-    ],
     "auto_detect_interface": true
   }
 }
